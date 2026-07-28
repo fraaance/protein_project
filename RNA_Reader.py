@@ -16,44 +16,58 @@ class FastaReader:
     def __init__(self, file_path):
         val, file_type = self.validate_path(file_path)
         self.prot_list = []
-
-        if val:
-            print("*" * 50)
-            if file_type == "prot":
-                print(" FASTA - Amino Acid Sequence".center(50, '*'))
-                header, seq = self.read_file(file_path)
-                accession, gene_name = re.split(r"\s+", header[0])
-                gene_id = int(header[2].replace("GeneID=", "").rstrip("]"))
-                accession=accession[1:]
-                protein = Protein(accession=accession, 
-                                gene_name=gene_name, 
-                                organism=header[1].replace("organism=", ""), 
-                                gene_id=gene_id, 
-                                sequence=seq)
-                print(f"Protein {gene_name} [GeneID={gene_id}]".ljust(50, " "))
-                print(seq)
-                self.prot_list.append(protein)
-            
-            if file_type == "dna":
-                print(" FASTA - DNA Sequence ".center(50, '*'))
-                print("*" * 50, "\n")
-                print("Translating DNA into Protein".center(50, "*"))
-                header, seq = self.read_file(file_path)
-            
-                #print(re.split(r"[:\-\s]+|(?<=c)(?=\d)", header[0]))
-                accession, strand, start, end, gene_name = re.split(r"[:\-\s]+|(?<=c)(?=\d)", header[0])
-                gene_id=int(header[2].replace("GeneID=", "").rstrip("]"))
-                seq = decode_rna_to_protein(seq.replace("T", "U"))
-                protein = Protein(accession="None",
-                        gene_name=gene_name, 
-                        organism=header[1].replace("organism=", "").rstrip("]"), 
-                        gene_id=gene_id, 
-                        sequence=seq)
-                print(f"Protein {gene_name} [GeneID={gene_id}]".ljust(50, " "))
-                print(seq)
-                #print(f"\nsequence {gene_name} [GeneID={gene_id}] successfully read".center(50, ' '))
-                self.prot_list.append(protein)
         
+        if val: 
+            content_list = self.read_file(file_path)
+            for content in content_list:
+                print("*" * 50)
+                if file_type == "prot":
+                    print(" FASTA - Amino Acid Sequence recognized ".center(50, '*'))
+                    header, seq = content
+                    #accession, gene_name = re.split(r"\s+", header[0])
+                    #gene_id = int(header[2].replace("GeneID=", "").rstrip("]"))
+                    #accession=accession[1:]
+                    accession = None
+                    gene_name = None
+                    organism = None
+                    gene_id = None
+
+                    protein = Protein(header=header,
+                                    accession=accession, 
+                                    gene_name=gene_name, 
+                                    organism=organism,#header[1].replace("organism=", ""), 
+                                    gene_id=gene_id, 
+                                    sequence=seq)
+                    print(f"Protein {gene_name} [GeneID={gene_id}]".ljust(50, " "))
+                    print(seq)
+                    self.prot_list.append(protein)
+                
+                if file_type == "dna":
+                    print(" FASTA - DNA Sequence recognized".center(50, '*'))
+                    print("Translating DNA into Protein".center(50, "*"))
+                    header, seq = content
+                
+                    #print(re.split(r"[:\-\s]+|(?<=c)(?=\d)", header[0]))
+                    #accession, strand, start, end, gene_name = re.split(r"[:\-\s]+|(?<=c)(?=\d)", header[0])
+                    #gene_id=int(header[2].replace("GeneID=", "").rstrip("]"))
+                    seq = decode_rna_to_protein(seq.replace("T", "U"))
+                    accession = None
+                    gene_name = None
+                    organism = None
+                    gene_id = None
+
+                    protein = Protein(header=header,
+                            accession="None",
+                            gene_name=gene_name, 
+                            organism=organism, #header[1].replace("organism=", "").rstrip("]"), 
+                            gene_id=gene_id, 
+                            sequence=seq)
+                    print(f"Protein {gene_name} [GeneID={gene_id}]".ljust(50, " "))
+                    print(seq)
+                    #print(f"\nsequence {gene_name} [GeneID={gene_id}] successfully read".center(50, ' '))
+                    self.prot_list.append(protein)
+                    
+        print((f" Number of found Sequences: {len(self.prot_list)} ".center(50, "*")))
 
     def validate_path(self, file_path):
         if (file_path.endswith(".faa")):
@@ -64,10 +78,24 @@ class FastaReader:
 
     def read_file(self, file_path):
         with open(file_path) as f:
-            lines = f.read().splitlines()
-            header = re.split(r"\s\[+", lines[0])
-            seq = "".join(lines[1:])
-        return header, seq
+            liste = re.split(">", f.read())[1:]
+            content_list = []
+            print(liste[0])
+
+            for e in liste:
+                lines = e.splitlines()
+                header = lines[0]
+                seq = "".join(lines[1:])
+                print("header: ", header)
+
+                content_list.append((header, seq))
+                #print(re.split(header))
+                
+        #with open(file_path) as f:
+        #    lines = f.read().splitlines()
+        #    header = re.split(r"\s\[+", lines[0])
+        #    seq = "".join(lines[1:])
+        return content_list
 
     def print_out(self, input):
         print("*" * 50)
@@ -119,18 +147,26 @@ class RNA:
     sequence: str 
         
 @dataclass
-class Protein: 
-    accession: str 
-    gene_name: str 
-    organism: str
-    gene_id: int
-    sequence: str 
+
+class Protein:
+    header: str
+    accession: str | None = None
+    gene_name: str | None = None
+    organism: str | None = None
+    gene_id: int | None = None
+    sequence: str = ""
 
 
 
 
+
+####################################################
+# Program calls
+####################################################
 gene_file = FastaReader("/Users/franzweisel/Downloads/project/nadE_NAD_synthetase/data/gene.fna")
-protein_file = FastaReader("/Users/franzweisel/Downloads/project/nadE_NAD_synthetase/data/protein.faa")
 
-#test_file = FastaReader("/Users/franzweisel/Documents/Systembio/Cutibacterium_granulosum_TM11/cuti_TM11_translated_cds.faa")
+protein_file = FastaReader("/Users/franzweisel/Downloads/project/nadE_NAD_synthetase/data/protein.faa")
+test_file = FastaReader("/Users/franzweisel/Documents/Systembio/Cutibacterium_granulosum_TM11/cuti_TM11_translated_cds.faa")
 test2_file = FastaReader("/Users/franzweisel/Downloads/ncbi_dataset-5/ncbi_dataset/data/protein.faa")
+
+test3_file = FastaReader("/Users/franzweisel/Documents/Systembio/Cutibacterium_granulosum_NCTC11865/GCA_900186975.1_50569_F01_cds_from_genomic.fna")
