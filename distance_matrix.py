@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 import re
 from RNA_Reader import FastaReader 
+from TrainValTestSplitter import TrainValTestSplitter
 
 def print_matrix(seq, dist_matrix):
     print("", *seq, sep="\t")
@@ -68,7 +69,7 @@ def validate_seq(seq):
     return True
 
 
-# opens the directory and extracts ever cif-file, calculates the seq dist matrix
+# opens the directory and extracts every cif-file, calculates the seq dist matrix
 # and stores the seq_name and seq in a common fasta-file
 def build_dataset(dir_name, output_dir):
     directory = Path(dir_name)
@@ -103,6 +104,11 @@ def build_dataset(dir_name, output_dir):
         dist_path = distance_dir / f"{seq_name}.npy"
         np.save(dist_path, dist_matrix) 
 
+    splitter = TrainValTestSplitter(output_dir)
+    train_list, val_list, test_list = splitter.train_val_test_split()
+
+    
+
 ############################################################
 ####################### program start ######################
 ############################################################
@@ -113,8 +119,8 @@ dictionary_path = sys.argv[1]
 output_dir = sys.argv[2]
 if validate_paths(dictionary_path=dictionary_path, output_dir=output_dir):
     build_dataset(dictionary_path, output_dir)
-print(f"FASTA-file stored at {output_dir}/sequences.faa")
-print(f"Distance Matrices stored in {output_dir}/distances/")
+print(f"FASTA-file stored as {output_dir}/sequences.faa")
+print(f"Distance Matrices stored under {output_dir}/distances/")
         
 # version two: data set already exists -> only calculate the distant matrices
 # distance_matrix.py -d dictionary_path.faa

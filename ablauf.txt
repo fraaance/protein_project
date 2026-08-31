@@ -1,0 +1,30 @@
+First Step:
+Build a mRNA-Reader:
+	insert fasta
+	test fasta and extract all info
+	test seq vality
+	stats about seq - length, CG count, amount of AA, place of start-codon
+	translate all AA (tree-variant)
+
+Second Step: 
+	create as package
+	diff. commands for the program
+	upload to github and make some version-extensions later
+
+Third Step:
+	include BLAST (very basic) 
+
+Forth Step: 
+	maybe smth with ncbi
+
+
+
+therefore:
+Python Cheat Sheet
+Regex (auswendig lernen)
+
+
+
+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
+
+tapjo8-hiVjus-ryrqoc
