@@ -3,6 +3,9 @@ from pathlib import Path
 import pandas as pd
 from sklearn.model_selection import train_test_split
 import numpy as np
+from RNA_Reader import FastaReader 
+
+
 
 class TrainValTestSplitter:
     def __init__(self, dir_path):
@@ -29,7 +32,7 @@ class TrainValTestSplitter:
             "0.2",
             "-c",
             "0.8"
-        ], check=True)
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         # Extract found clusters
         cluster_df = pd.read_csv(str(output_dir / "clusters_cluster.tsv"),
@@ -54,10 +57,32 @@ class TrainValTestSplitter:
         test_set = cluster_df[cluster_df["cluster"].isin(test_cl)]["prot_id"].tolist()
         val_set = cluster_df[cluster_df["cluster"].isin(val_cl)]["prot_id"].tolist()
 
+        # get the sequences, numerical encoded
+        reader = FastaReader(str(fasta_path))
+        prot_list = reader.prot_list
+
+        prot_dict = {prot.header: prot.sequence for prot in reader.prot_list}
+
         distances_path = directory / "distances"
-        train_list = [(el, np.load(f"{distances_path}/{el}.npy")) for el in train_set]
-        val_list = [(el, np.load(f"{distances_path}/{el}.npy")) for el in val_set]
-        test_list = [(el, np.load(f"{distances_path}/{el}.npy")) for el in test_set]
-                
+        train_list = [(self.aa_encoder(prot_dict[el]), np.load(f"{distances_path}/{el}.npy")) for el in train_set]
+        val_list = [(self.aa_encoder(prot_dict[el]), np.load(f"{distances_path}/{el}.npy")) for el in val_set]
+        test_list = [(self.aa_encoder(prot_dict[el]), np.load(f"{distances_path}/{el}.npy")) for el in test_set]
+        
         return train_list, val_list, test_list
-#train_set, val_set, test_set = train_val_test_split("/Users/franzweisel/Downloads/project_output")
+    
+    def aa_encoder(self, seq):
+        aa_to_int = {
+        "A": 1, "C": 2, "D": 3,
+        "E": 4, "F": 5, "G": 6,
+        "H": 7, "I": 8, "K": 9,
+        "L": 10, "M": 11, "N": 12,
+        "P": 13, "Q": 14, "R": 15,
+        "S": 16, "T": 17, "V": 18,
+        "W": 19, "Y": 20
+        }
+        encod_seq = [aa_to_int[c] for c in seq]
+
+        encod_seq += [0] * (256 - len(encod_seq))
+
+        return np.array(encod_seq, dtype=np.int32)
+ #train_set, val_set, test_set = train_val_test_split("/Users/franzweisel/Downloads/project_output")
