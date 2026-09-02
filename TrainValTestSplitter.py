@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 from sklearn.model_selection import train_test_split
 import numpy as np
-from RNA_Reader import FastaReader 
+from FileManager import FastaManager
 
 
 
@@ -58,12 +58,12 @@ class TrainValTestSplitter:
         val_set = cluster_df[cluster_df["cluster"].isin(val_cl)]["prot_id"].tolist()
 
         # get the sequences, numerical encoded
-        reader = FastaReader(str(fasta_path))
-        prot_list = reader.prot_list
+        reader = FastaManager()
+        prot_list = reader.read_file(fasta_path)
 
-        prot_dict = {prot.header: prot.sequence for prot in reader.prot_list}
+        prot_dict = {header: seq for header, seq in prot_list}
 
-        distances_path = directory / "distances"
+        distances_path = directory / "dist_matrices"
         train_list = [(self.aa_encoder(prot_dict[el]), np.load(f"{distances_path}/{el}.npy")) for el in train_set]
         val_list = [(self.aa_encoder(prot_dict[el]), np.load(f"{distances_path}/{el}.npy")) for el in val_set]
         test_list = [(self.aa_encoder(prot_dict[el]), np.load(f"{distances_path}/{el}.npy")) for el in test_set]
@@ -82,7 +82,7 @@ class TrainValTestSplitter:
         }
         encod_seq = [aa_to_int[c] for c in seq]
 
-        encod_seq += [0] * (256 - len(encod_seq))
+        encod_seq += [0] * (512 - len(encod_seq))
 
         return np.array(encod_seq, dtype=np.int32)
  #train_set, val_set, test_set = train_val_test_split("/Users/franzweisel/Downloads/project_output")
