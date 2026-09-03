@@ -53,7 +53,7 @@ if args.clusters is None:
     print("No cluster file provided - MMseqs2 cluster")
 
 else:
-    cluster_path = Path(args.clusers)
+    cluster_path = Path(args.clusters)
 
     if not cluster_path.is_file():
         raise ValueError("Cluster .tsv does not exist")
@@ -70,8 +70,10 @@ if args.m == "learn":
     print("Training new model on .cif directory")
 
 elif args.m == "no_learn":
-    print("Skipping training of new model")
-
+    print("Skipping training of new model, using pretrained model")
+    keras_path = Path(__file__).resolve().parent / "pretrained_models/base_model.keras"
+    print(keras_path)
+    
 else:
     keras_path = Path(args.m)
 
@@ -94,7 +96,6 @@ else:
     if not output_dir_path.is_dir():
         raise ValueError(f"{output_dir_path} is not a directory")
     
-
 print(db_path, cluster_path, keras_path, output_dir_path, model_mode)
 
 predictor = ProtPredictor(

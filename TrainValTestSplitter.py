@@ -11,7 +11,8 @@ class TrainValTestSplitter:
     def __init__(self, dir_path):
         self.dir_path = Path(dir_path)
 
-    def train_val_test_split(self):
+    # train/val/test [80/10/10] split, based on cluster
+    def train_val_test_split(self, cluster_path):
         directory = self.dir_path
 
         fasta_path = directory / "sequences.faa"
@@ -22,18 +23,20 @@ class TrainValTestSplitter:
         tmp = output_dir / "mmseq2_tmp"
 
         # Run MMSEQ2 to find clusters and prevent to similar train-val-test sets
-        subprocess.run([
-            "mmseqs",
-            "easy-cluster",
-            str(fasta_path),
-            str(clusters),
-            str(tmp),
-            "--min-seq-id",
-            "0.2",
-            "-c",
-            "0.8"
-        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
+        # if cluster is already available:
+        if cluster_path is not None: 
+            try:
+                cluster_df = pd.read_csv(str(cluster_path),
+                            sep="\t",
+                            names=["cluster", "prot_id"])
+                print(f" not running MM2Seq - cluster provided ".center(50, "*"))
+            except ValueError():
+                print(f"no valid .tsv file provided for cluster extraction".center(50, "*"))
+        else:
+            self.run_mm2seq(fasta_path, clusters, tmp)
+            cluster_df = pd.read_csv(str(output_dir / "clusters_cluster.tsv"),
+                            sep="\t",
+                            names=["cluster", "prot_id"])
         # Extract found clusters
         cluster_df = pd.read_csv(str(output_dir / "clusters_cluster.tsv"),
                             sep="\t",
@@ -51,11 +54,11 @@ class TrainValTestSplitter:
             temp_cl, test_size=0.5, random_state=42
         ) 
 
-
+        ######## shorten this later!
         # Combine with Distance Matrices as tupel-list
         train_set = cluster_df[cluster_df["cluster"].isin(train_cl)]["prot_id"].tolist()
-        test_set = cluster_df[cluster_df["cluster"].isin(test_cl)]["prot_id"].tolist()
         val_set = cluster_df[cluster_df["cluster"].isin(val_cl)]["prot_id"].tolist()
+        test_set = cluster_df[cluster_df["cluster"].isin(test_cl)]["prot_id"].tolist()
 
         # get the sequences, numerical encoded
         reader = FastaManager()
@@ -69,6 +72,20 @@ class TrainValTestSplitter:
         test_list = [(self.aa_encoder(prot_dict[el]), np.load(f"{distances_path}/{el}.npy")) for el in test_set]
         
         return train_list, val_list, test_list
+    
+    def run_mm2seq(self, fasta_path, clusters, tmp):
+        print(f" running MM2Seq ".center(50, "*"))
+        subprocess.run([
+            "mmseqs",
+            "easy-cluster",
+            str(fasta_path),
+            str(clusters),
+            str(tmp),
+            "--min-seq-id",
+            "0.2",
+            "-c",
+            "0.8"
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
     def aa_encoder(self, seq):
         aa_to_int = {
@@ -85,4 +102,5 @@ class TrainValTestSplitter:
         encod_seq += [0] * (512 - len(encod_seq))
 
         return np.array(encod_seq, dtype=np.int32)
+
  #train_set, val_set, test_set = train_val_test_split("/Users/franzweisel/Downloads/project_output")

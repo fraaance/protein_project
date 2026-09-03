@@ -46,5 +46,6 @@ def run_model(model, train_list, val_list, test_list):
 
     test_loss, test_acc = model.evaluate(test_samples, test_labels)
     print(f"test accuracy: {test_acc}")
-    
 
+    #model.save("/Users/franzweisel/Downloads/project/base_model.keras")
+    

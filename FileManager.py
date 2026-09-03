@@ -160,13 +160,15 @@ class cifManager:
                 if len(seq) == len(entity_c_atoms):
                     output_list.append((seq_name, seq, entity_c_atoms))
                     #print(len(seq), entity_c_atoms.shape)
+                #print(len(seq), len(entity_c_atoms))
+        #print(output_list)
         #print(output_list)
         return output_list
 
     # returns seq_name, dist_matrix
     def calculate_dist_matrix(self, seq_name, seq, atom_df):
         id = atom_df["entity_id"]
-        print(f"LENGHT OF SEQ: {len(seq)}".center(100, "#"))
+        #print(f"LENGHT OF SEQ: {len(seq)}".center(100, "#"))
         if len(seq) != len(atom_df) or len(seq) > 512:
             print(f" Skipped prot: {seq_name}; Length mismatch ".center(50, "*"))
             return None, None
