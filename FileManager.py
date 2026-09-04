@@ -82,6 +82,14 @@ class cifManager:
         self.directory_path = directory_path
         self.output_dir_path = output_dir_path
         num_stars = 50
+        aa_3to1 = {
+        "ALA": "A", "ARG": "R", "ASN": "N", "ASP": "D",
+        "CYS": "C", "GLN": "Q", "GLU": "E", "GLY": "G",
+        "HIS": "H", "ILE": "I", "LEU": "L", "LYS": "K",
+        "MET": "M", "PHE": "F", "PRO": "P", "SER": "S",
+        "THR": "T", "TRP": "W", "TYR": "Y", "VAL": "V"
+        }
+        aa_1to3 = {v: k for k, v in aa_3to1.items()}  
 
     def validate_paths(self, directory_path, output_dir_path):
         directory_path = Path(directory_path)
@@ -95,74 +103,84 @@ class cifManager:
 
     # returns list with: seq_name, seq, atom_df
     def read_cif_file(self, directory_path):
-        #if not self.validate_cif_path(file_path):
-        #    return False
-
         directory_path = Path(directory_path)
         output_list = []
 
         for file in directory_path.glob("*.cif"):
-
             print(f" Reading File {str(file)[-8:]} ".center(50, "*"))
-
             cif = MMCIF2Dict(file)
 
             prot_df = pd.DataFrame(
                 {
                     "entity_id": cif["_struct_ref.id"],
-                    #"entity_id": cif["_entity_poly.entity_id"],
                     "seq_name": cif["_struct_ref.pdbx_db_accession"],
                     "seq": cif["_struct_ref.pdbx_seq_one_letter_code"]
-                    #"seq": cif["_entity_poly.pdbx_seq_one_letter_code"],
-                    #"chains": cif["_entity_poly.pdbx_strand_id"],
-                    #"type": cif["_entity_poly.type"]
                 }
             )
 
-            print(prot_df)
-
-            # remove non amino acid sequences
+            #remove sequences that are not an amino acid
             prot_df = self.remove_non_aa_sequences(prot_df)
+
+            # store seq_name and sequence for later call up
+            seq_dict = dict(prot_df[["seq_name", "seq"]].itertuples(index=False, name=None))
+
+            # transform this dataframe from entity_id, seq_name, seq into
+            # list: [entity_id, seq_name, pos, aminoacid]
+            print(prot_df.head(), "prot_df")
+
+            # transform linear amino acid seq into dataframe with every amino acid being a own row
+            prot_list = [
+                [row["entity_id"], row["seq_name"], pos, aa]
+                for _, row in prot_df.iterrows()
+                for pos, aa in enumerate(row["seq"], start=1)
+            ]
+
+            prot_res_df = pd.DataFrame(prot_list, columns=["entity_id", "seq_name", "pos", "seq_amino_acid"])
             
             atom_df = pd.DataFrame(
                 {
                     "atom": cif["_atom_site.label_atom_id"],
                     "amino_acid": cif["_atom_site.label_comp_id"],
                     "entity_id": cif["_atom_site.label_entity_id"],
-                    #"chain": cif["_atom_site.label_asym_id"],
                     "seq_id": cif["_atom_site.label_seq_id"],
                     "x": cif["_atom_site.Cartn_x"],
                     "y": cif["_atom_site.Cartn_y"],
                     "z": cif["_atom_site.Cartn_z"],
-                    #"occupacy" : cif["_atom_site.occupancy"],
+                    # alt_id to remove alternative chains -> only the first is kept
                     "alt_id": cif["_atom_site.label_alt_id"]
                 }
             )
-            
-            atom_df = atom_df[(atom_df["atom"] == "CA")].copy()
 
-            atom_df_chiral = atom_df[
-                atom_df["alt_id"].isin([".", "A"])
-            ].copy()
-            atom_df_chiral = atom_df_chiral.drop_duplicates(
-                subset=["entity_id", "seq_id"],
-                keep="first"
+            # only extract chiral centres and remove alternative positions
+            atom_df_chiral = (atom_df[
+                (atom_df["atom"] == "CA") & (atom_df["alt_id"].isin([".", "A"]))
+            ].drop_duplicates(subset=["entity_id", "seq_id"], keep="first").copy()
             )
 
-            for _, row in prot_df.iterrows():
-                entity_id = row["entity_id"]
-                seq = row["seq"]
-                seq_name = row["seq_name"]
+            # merge for entity = entity, seq_id = pos
+            prot_res_df["pos"] = prot_res_df["pos"].astype(int)
+            atom_df_chiral["seq_id"] = atom_df_chiral["seq_id"].astype(int)
 
-                entity_c_atoms = atom_df_chiral[atom_df_chiral["entity_id"] == str(entity_id)]
+            merged_df = prot_res_df.merge(
+                atom_df_chiral[
+                    ["entity_id", "seq_id", "amino_acid", "x", "y", "z"]
+                ],
+                left_on=["entity_id", "pos"],
+                right_on=["entity_id", "seq_id"],
+                how="left"
+            ).drop(columns=["seq_id", "amino_acid"])
 
-                # only keeps sequences with valid length 
-                if len(seq) == len(entity_c_atoms):
-                    output_list.append((seq_name, seq, entity_c_atoms))
-                    #print(len(seq), entity_c_atoms.shape)
-                #print(len(seq), len(entity_c_atoms))
-        #print(output_list)
-        #print(output_list)
+            for seq_name, protein_df in merged_df.groupby("seq_name"):
+
+                missing_values = protein_df["x"].isna().sum()
+                if (len(protein_df) - missing_values) < len(protein_df) * 0.7:
+                    print(f" sequence {seq_name} has less than 70% of coordinates; skipped ".center(50, "*"))
+                    continue
+
+                protein_df = protein_df.drop(columns=["seq_name"])
+                output_list.append((seq_name, seq_dict.get(seq_name),protein_df))
+
+        print(output_list)
         return output_list
 
     # returns seq_name, dist_matrix
@@ -201,6 +219,9 @@ class cifManager:
 
         return df
 
+    def translate_aa(self, item):
+        item = item.upper()
+        return self.aa_3to1.get(item, self.aa_1to3.get(item))
 
 #class MMSeqManager:
 
