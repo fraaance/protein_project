@@ -10,6 +10,7 @@ from FileManager import FastaManager
 class TrainValTestSplitter:
     def __init__(self, dir_path):
         self.dir_path = Path(dir_path)
+        self.num_stars = 70
 
     # train/val/test [80/10/10] split, based on cluster
     def train_val_test_split(self, cluster_path):
@@ -29,9 +30,9 @@ class TrainValTestSplitter:
                 cluster_df = pd.read_csv(str(cluster_path),
                             sep="\t",
                             names=["cluster", "prot_id"])
-                print(f" not running MM2Seq - cluster provided ".center(50, "*"))
+                print(f" not running MM2Seq - cluster provided ".center(self.num_stars, "*"))
             except ValueError():
-                print(f"no valid .tsv file provided for cluster extraction".center(50, "*"))
+                print(f"no valid .tsv file provided for cluster extraction".center(self.num_stars, "*"))
         else:
             self.run_mm2seq(fasta_path, clusters, tmp)
             cluster_df = pd.read_csv(str(output_dir / "clusters_cluster.tsv"),
@@ -46,13 +47,8 @@ class TrainValTestSplitter:
         clusters = cluster_df["cluster"].unique()
 
         # train, val, test split of clusters
-        train_cl, temp_cl = train_test_split(
-            clusters, test_size=0.2, random_state=42
-        )
-
-        val_cl, test_cl = train_test_split(
-            temp_cl, test_size=0.5, random_state=42
-        ) 
+        train_cl, temp_cl = train_test_split(clusters, test_size=0.2, random_state=42)
+        val_cl, test_cl = train_test_split(temp_cl, test_size=0.5, random_state=42) 
 
         ######## shorten this later!
         # Combine with Distance Matrices as tupel-list
@@ -67,14 +63,32 @@ class TrainValTestSplitter:
         prot_dict = {header: seq for header, seq in prot_list}
 
         distances_path = directory / "dist_matrices"
-        train_list = [(self.aa_encoder(prot_dict[el]), np.load(f"{distances_path}/{el}.npy")) for el in train_set]
-        val_list = [(self.aa_encoder(prot_dict[el]), np.load(f"{distances_path}/{el}.npy")) for el in val_set]
-        test_list = [(self.aa_encoder(prot_dict[el]), np.load(f"{distances_path}/{el}.npy")) for el in test_set]
         
+        train_list = self.build_data_list(distances_path, train_set, prot_dict)
+        val_list = self.build_data_list(distances_path, val_set, prot_dict)
+        test_list = self.build_data_list(distances_path, test_set, prot_dict)
         return train_list, val_list, test_list
     
+    def build_data_list(self, distances_path, prot_set, prot_dict):
+        liste = []
+
+        for el in prot_set:
+            path = distances_path / f"{el}.npz"
+
+            if path.exists() and el in prot_dict:
+                tmp = np.load(path)
+                a = tmp["dist_matrix"]
+                b = tmp["mask"]
+
+                # here: change to (dist_matrix, mask) -> seq_name and seq stored and sent to 
+                liste.append((self.aa_encoder(prot_dict[el]), (tmp["dist_matrix"], tmp["mask"])))
+            else: 
+                print(f" file {el}.npy not found".center(self.num_stars, "*"))
+
+        return liste
+        
     def run_mm2seq(self, fasta_path, clusters, tmp):
-        print(f" running MM2Seq ".center(50, "*"))
+        print(f" running MM2Seq ".center(self.num_stars, "*"))
         subprocess.run([
             "mmseqs",
             "easy-cluster",

@@ -2,6 +2,7 @@ from pathlib import Path
 import argparse
 from ProtPred import ProtPredictor
 
+num_stars = 70
 
 parser = argparse.ArgumentParser(description="Protein distance matrix prediction")
 
@@ -31,8 +32,6 @@ parser.add_argument(
     help="Optional output-dir; default is dir within cif-DB directory"
 )
 
-
-
 args = parser.parse_args()
 
 ######### check Database
@@ -50,7 +49,7 @@ if not cif_files:
 ######## check Cluster
 cluster_path = None
 if args.clusters is None:
-    print("No cluster file provided - MMseqs2 cluster")
+    print(f"No cluster file provided - MMseqs2 cluster")
 
 else:
     cluster_path = Path(args.clusters)
@@ -62,18 +61,16 @@ else:
         raise ValueError("Cluster file must be a .tsv file")
     
 ######## check Model
-    
 keras_path = None
 model_mode = args.m
 
 if args.m == "learn":
-    print("Training new model on .cif directory")
+    print(f" Training new model on .cif directory".center(num_stars, "*") )
 
 elif args.m == "no_learn":
-    print("Skipping training of new model, using pretrained model")
+    print(f" Skipping training of new model, using pretrained model ".center(num_stars, "*"))
     keras_path = Path(__file__).resolve().parent / "pretrained_models/base_model.keras"
-    print(keras_path)
-    
+
 else:
     keras_path = Path(args.m)
 
@@ -82,7 +79,7 @@ else:
     if keras_path.suffix != ".keras":
         raise ValueError("Model must be .keras file")
     
-    print("Loading existing model")
+    print(f" Loading existing model ".center(num_stars, "*"))
 
 ######## check Output Directory
 if args.o is None:

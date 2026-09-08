@@ -13,7 +13,7 @@ class ProtPredictor:
         self.keras_path = keras_path
         self.output_dir_path = output_dir_path
         self.model_mode = model_mode
-        self.num_stars = 50
+        self.num_stars = 70
 
         self.build_directory(db_path, cluster_path, output_dir_path)
         train_list, val_list, test_list = self.build_train_dataset(cluster_path, output_dir_path)
@@ -44,9 +44,10 @@ class ProtPredictor:
         
         for seq_name, seq, atom_df in prot_db:
             print(f" Calculating distance matrix for {seq_name} ")
-            name, matrix = cif_manager.calculate_dist_matrix(seq_name, seq, atom_df)
-            if name is not None:
-                cif_manager.save_dist_matrix(name, matrix, dist_matrix_dir)
+            output = cif_manager.calculate_dist_matrix(seq_name, seq, atom_df)
+            if output is not None:
+                name, matrix, mask = output
+                cif_manager.save_dist_matrix(name, matrix, mask, dist_matrix_dir)
 
         ###### store the sequences of the cif-directory in the sequences.faa file
         self.store_sequences(prot_db, output_dir_path)

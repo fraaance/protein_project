@@ -13,7 +13,7 @@ from scipy.spatial.distance import cdist
 #                                            adds new sequences from the list -> no duplicates 
 class FastaManager:
     def __init__(self):
-        num_stars = 5
+        num_stars = 70
 
     def read_file(self, file_path):
         if self.validate_path(file_path):
@@ -81,7 +81,8 @@ class cifManager:
     def __init__(self, directory_path, output_dir_path):
         self.directory_path = directory_path
         self.output_dir_path = output_dir_path
-        num_stars = 50
+        self.num_stars = 70
+
         aa_3to1 = {
         "ALA": "A", "ARG": "R", "ASN": "N", "ASP": "D",
         "CYS": "C", "GLN": "Q", "GLU": "E", "GLY": "G",
@@ -107,7 +108,7 @@ class cifManager:
         output_list = []
 
         for file in directory_path.glob("*.cif"):
-            print(f" Reading File {str(file)[-8:]} ".center(50, "*"))
+            print(f" Reading File {str(file)[-8:]} ".center(self.num_stars, "*"))
             cif = MMCIF2Dict(file)
 
             prot_df = pd.DataFrame(
@@ -126,7 +127,6 @@ class cifManager:
 
             # transform this dataframe from entity_id, seq_name, seq into
             # list: [entity_id, seq_name, pos, aminoacid]
-            print(prot_df.head(), "prot_df")
 
             # transform linear amino acid seq into dataframe with every amino acid being a own row
             prot_list = [
@@ -158,7 +158,14 @@ class cifManager:
             )
 
             # merge for entity = entity, seq_id = pos
-            prot_res_df["pos"] = prot_res_df["pos"].astype(int)
+            inval_seq = atom_df_chiral.loc[
+                pd.to_numeric(atom_df_chiral["seq_id"], errors="coerce").isna(), "entity_id"
+            ].unique()
+
+            atom_df_chiral = atom_df_chiral[~atom_df_chiral["entity_id"].isin(inval_seq)].copy()
+            atom_df_chiral["seq_id"] = atom_df_chiral["seq_id"].astype(int)
+            
+            # to prevent bug with non numerical seq_id's:
             atom_df_chiral["seq_id"] = atom_df_chiral["seq_id"].astype(int)
 
             merged_df = prot_res_df.merge(
@@ -170,41 +177,42 @@ class cifManager:
                 how="left"
             ).drop(columns=["seq_id", "amino_acid"])
 
-            for seq_name, protein_df in merged_df.groupby("seq_name"):
-
+            for (seq_name, protein_df) in merged_df.groupby("seq_name"):
                 missing_values = protein_df["x"].isna().sum()
                 if (len(protein_df) - missing_values) < len(protein_df) * 0.7:
-                    print(f" sequence {seq_name} has less than 70% of coordinates; skipped ".center(50, "*"))
+                    print(f" sequence {seq_name} has less than 70% of coordinates; skipped ".center(self.num_stars, "*"))
                     continue
 
                 protein_df = protein_df.drop(columns=["seq_name"])
                 output_list.append((seq_name, seq_dict.get(seq_name),protein_df))
 
-        print(output_list)
         return output_list
 
     # returns seq_name, dist_matrix
     def calculate_dist_matrix(self, seq_name, seq, atom_df):
-        id = atom_df["entity_id"]
-        #print(f"LENGHT OF SEQ: {len(seq)}".center(100, "#"))
-        if len(seq) != len(atom_df) or len(seq) > 512:
-            print(f" Skipped prot: {seq_name}; Length mismatch ".center(50, "*"))
-            return None, None
-
-        vectors = atom_df[["x", "y", "z"]].to_numpy(dtype=float)
-        dist_matrix = cdist(vectors, vectors, metric='euclidean')
-
-        # limit distance_matrix and allowed seq size to 512
-        dummy = np.zeros((512, 512), dtype=float)
-        n = len(seq)
-        dummy[:n, :n] = dist_matrix
+        if len(seq) > 512 or len(atom_df) > 512:
+            print(f" skipped {seq_name} ".center(self.num_stars, "*"))
+            return None
         
-        return seq_name, dummy
+        vectors = atom_df[["x", "y", "z"]].to_numpy(dtype=float)
+        valid_residues = ~np.isnan(vectors).any(axis=1)
+
+        dist_matrix = np.zeros((512, 512), dtype=np.float32)
+        mask = np.zeros((512, 512), dtype=np.float32)
+        indeces = np.where(valid_residues)[0]
+
+        valid_coords = vectors[valid_residues]
+        dists = cdist(valid_coords, valid_coords)
+
+        dist_matrix[np.ix_(indeces, indeces)] = dists
+        mask[np.ix_(indeces, indeces)] = 1.0
+
+        return seq_name, dist_matrix, mask
 
     # saves dist_matrix as: seq_name.npy under output_dir/dist_matrices/seq_name.npy
-    def save_dist_matrix(self, seq_name, dist_matrix, output_dir_path):
-        dist_matrix_path = output_dir_path / f"{seq_name}.npy"
-        np.save(dist_matrix_path, dist_matrix)
+    def save_dist_matrix(self, seq_name, dist_matrix, mask, output_dir_path):
+        dist_matrix_path = output_dir_path / f"{seq_name}.npz"
+        np.savez(dist_matrix_path, dist_matrix=dist_matrix, mask=mask)
 
     # to add: .cif.gz files -> for unzipping
     def validate_cif_path(self, file_path):
@@ -216,26 +224,8 @@ class cifManager:
 
         df["seq"] = df["seq"].str.replace("\n", "", regex=False)
         df = df[df["seq"].apply(lambda seq: set(seq).issubset(alph))].copy()
-
         return df
 
     def translate_aa(self, item):
         item = item.upper()
         return self.aa_3to1.get(item, self.aa_1to3.get(item))
-
-#class MMSeqManager:
-
-#manager = FastaManager()
-
-#lsite = manager.read_file("/Users/franzweisel/Downloads/project_output/sequences.faa")
-#print(len(lsite))
-#print(lsite)
-#manager.write_file("/Users/franzweisel/Downloads/project_output/sequences2.faa", lsite)
-
-#manager = cifManager("/Users/franzweisel/Downloads/testtt", "/Users/franzweisel/Downloads/testtt_output")
-#path = Path("/Users/franzweisel/Downloads/testtt")
-#x = manager.read_cif_file(path)
-#print("end".center(50, "+"))
-#print(x)
-#for file in path.glob("*.cif"):
-    #manager.read_cif_file(file)
