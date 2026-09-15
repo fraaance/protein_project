@@ -71,8 +71,9 @@ def loss_mask_mse(y_true, y_pred):
     mask = y_true[..., 1]
 
     sq_error = tf.square(dist - y_pred) * mask
-
-    return tf.reduce_sum(sq_error) / tf.maximum(tf.reduce_sum(mask), 1.0)
+    x = tf.reduce_sum(sq_error) / tf.maximum(tf.reduce_sum(mask), 1.0)
+    #print(x)
+    return x
 
 def loss_mask_mae(y_true, y_pred):
 
