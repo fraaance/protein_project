@@ -45,7 +45,6 @@ cif_files = list(db_path.glob("*.cif"))
 if not cif_files:
     raise ValueError("No .cif files found in database directory")
 
-
 ######## check Cluster
 cluster_path = None
 if args.clusters is None:

@@ -33,7 +33,6 @@ class FastaManager:
                     print(f"Seq: {header}")
                     prot_list.append((header, seq))
             return prot_list
-            
 
     def write_file(self, file_path, seq_list):
         path = file_path
@@ -70,8 +69,6 @@ class FastaManager:
         if len(seq) <= 0 or len(seq) > max_length or not re.match(r"[A-Z]", seq):
             return False
         return True
-
-
 
 # manager.cifManager(directory_path, output_dir_path) -> directory_path has to exist and all the files have to be .cif format
 # manager.read_cif_file(file_path) -> returns list with all the amino acid seqences in the file, incl the information for distance matrix

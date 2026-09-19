@@ -5,8 +5,6 @@ from sklearn.model_selection import train_test_split
 import numpy as np
 from FileManager import FastaManager
 
-
-
 class TrainValTestSplitter:
     def __init__(self, dir_path):
         self.dir_path = Path(dir_path)
@@ -50,7 +48,6 @@ class TrainValTestSplitter:
         train_cl, temp_cl = train_test_split(clusters, test_size=0.2, random_state=42)
         val_cl, test_cl = train_test_split(temp_cl, test_size=0.5, random_state=42) 
 
-        ######## shorten this later!
         # Combine with Distance Matrices as tupel-list
         train_set = cluster_df[cluster_df["cluster"].isin(train_cl)]["prot_id"].tolist()
         val_set = cluster_df[cluster_df["cluster"].isin(val_cl)]["prot_id"].tolist()
@@ -59,14 +56,26 @@ class TrainValTestSplitter:
         # get the sequences, numerical encoded
         reader = FastaManager()
         prot_list = reader.read_file(fasta_path)
-
+        distances_path = directory / "dist_matrices"
         prot_dict = {header: seq for header, seq in prot_list}
 
-        distances_path = directory / "dist_matrices"
+        train_list = [
+            (seq_name, self.aa_encoder(prot_dict[seq_name]))
+                for seq_name in train_set
+                if seq_name in prot_dict
+        ]
         
-        train_list = self.build_data_list(distances_path, train_set, prot_dict)
-        val_list = self.build_data_list(distances_path, val_set, prot_dict)
-        test_list = self.build_data_list(distances_path, test_set, prot_dict)
+        val_list = [
+            (seq_name, self.aa_encoder(prot_dict[seq_name]))
+                for seq_name in val_set
+                if seq_name in prot_dict
+        ]
+        test_list = [
+            (seq_name, self.aa_encoder(prot_dict[seq_name]))
+                for seq_name in test_set
+                if seq_name in prot_dict
+        ]
+        
         return train_list, val_list, test_list
     
     def build_data_list(self, distances_path, prot_set, prot_dict):
@@ -116,5 +125,3 @@ class TrainValTestSplitter:
         encod_seq += [0] * (512 - len(encod_seq))
 
         return np.array(encod_seq, dtype=np.int32)
-
- #train_set, val_set, test_set = train_val_test_split("/Users/franzweisel/Downloads/project_output")

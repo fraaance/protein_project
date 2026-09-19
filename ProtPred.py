@@ -5,6 +5,8 @@ import numpy as np
 from FileManager import FastaManager, cifManager
 from TrainValTestSplitter import TrainValTestSplitter
 from ML_Model import forward_net, run_model
+import keras
+import matplotlib.pyplot as plt
 
 class ProtPredictor:
     def __init__(self, db_path, cluster_path, keras_path, output_dir_path, model_mode):
@@ -19,9 +21,13 @@ class ProtPredictor:
         train_list, val_list, test_list = self.build_train_dataset(cluster_path, output_dir_path)
         
         if keras_path is None:
+            distances_path = output_dir_path / "dist_matrices"
             print(f" training model ".center(self.num_stars, "*"))
             model = forward_net()
-            run_model(model, train_list, val_list, test_list)
+            save_model, fig = run_model(model, train_list, val_list, test_list, distances_path)
+            save_model.save(f"{output_dir_path}/model.keras")
+            fig.savefig(f"{output_dir_path}/training.png")
+            plt.show()
             
     # directory with:
             # mmseq2_output -> cluster information
